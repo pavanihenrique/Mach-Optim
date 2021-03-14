@@ -57,17 +57,28 @@ void populate_dict(std::ifstream& input, MachineMap& dict, int N, int T) {
 	return;
 }
 
-int check_availability(MachineMap& dict, int curr_day) {
-	int found = 0;
-
-	for (auto it = dict.begin(); it != dict.end(); ++it) {
-		if ((*(it->second)).getAvailability() == curr_day)	found = 1;
+void reset_dict(MachineMap& dict) {
+	for (MachineMap::iterator it = dict.begin(); it != dict.end(); ++it) {
+//		MachineMap::iterator it2 = it;
+//		++it2;
+		(it->second).reset();
+//		dict.erase(it);
+//		it = it2;
 	}
-
-	return found;
+	MachineMap::iterator dict_begin = dict.begin();
+	MachineMap::iterator dict_end = dict.end();
+	dict.erase(dict_begin, dict_end);
 }
 
-int buy_decision(MachineMap& dict, int curr_machine, int curr_money, int curr_day, int T) {
+int check_availability(MachineMap& dict, int curr_day) {
+	for (auto it = dict.begin(); it != dict.end(); ++it) {
+		if ((*(it->second)).getAvailability() == curr_day)	return it->first;
+	}
+
+	return 0;
+}
+
+int buy_decision(MachineMap& dict, int curr_machine, int curr_money, int curr_day, int T, int i_index) {
 	int result = 0, curr_projection = 0, candidate_projection = 0, breakeven = 0;
 	
 	int days_left = T - curr_day;
@@ -84,29 +95,29 @@ int buy_decision(MachineMap& dict, int curr_machine, int curr_money, int curr_da
 	}
 
 	// encontra o melhor candidato de compra baseado no resultado final, se mantido, e breakeven (critério de desempate)
-	for (auto& it : dict) {
-		if ((*(it.second)).getAvailability() == curr_day) {
-			if (avail_money >= (*(it.second)).getPrice()) {
-				result = avail_money - (*(it.second)).getPrice() + (*(it.second)).getGain() * days_left + (*(it.second)).getResellPrice();
+	for (MachineMap::iterator it = dict.find(i_index); it != dict.end(); ++it) {
+		if ((*(it->second)).getAvailability() == curr_day) {
+			if (avail_money >= (*(it->second)).getPrice()) {
+				result = avail_money - (*(it->second)).getPrice() + (*(it->second)).getGain() * days_left + (*(it->second)).getResellPrice();
 
 				breakeven = curr_day + 1;
 				curr_projection = curr_money;
 				if (curr_machine != 0) curr_projection = curr_projection + dict[curr_machine]->getGain();
-				candidate_projection = avail_money - (*(it.second)).getPrice();
+				candidate_projection = avail_money - (*(it->second)).getPrice();
 				while (curr_projection > candidate_projection && breakeven < T) {
 					++breakeven;
 					if (curr_machine != 0) curr_projection = curr_projection + dict[curr_machine]->getGain();
-					candidate_projection = candidate_projection + (*(it.second)).getGain();
+					candidate_projection = candidate_projection + (*(it->second)).getGain();
 				}
 
 				if (result > best_result || (best_candidate != curr_machine && result == best_result && breakeven < best_breakeven)) {
-					best_candidate = it.first;
+					best_candidate = it->first;
 					best_result = result;
 					best_breakeven = breakeven;
 				}
 			}
 		}
-		else if ((*(it.second)).getAvailability() > curr_day) break;
+		else if ((*(it->second)).getAvailability() > curr_day) break;
 	}
 
 	//verifica se existe uma melhor opção de compra durante o período de breakeven do melhor candidato
@@ -142,12 +153,13 @@ int buy_decision(MachineMap& dict, int curr_machine, int curr_money, int curr_da
 
 int optim_solver(int N, int M, int T, MachineMap& dict) {
 	int curr_machine = 0, curr_money = M;
-	int buy = 0;
+	int avail_index = 0, buy = 0;
 	//int D = 0, P = 0, R = 0, G = 0;
 
 	for (int curr_day = 1; curr_day <= T; ++curr_day) {
-		if (check_availability(dict, curr_day)) {
-			buy = buy_decision(dict, curr_machine, curr_money, curr_day, T);
+		avail_index = check_availability(dict, curr_day);
+		if (avail_index != 0) {
+			buy = buy_decision(dict, curr_machine, curr_money, curr_day, T, avail_index);
 			if (buy) {
 				if (curr_machine != 0) curr_money = curr_money + dict[curr_machine]->getResellPrice();
 				curr_machine = buy;
@@ -185,6 +197,7 @@ int main () {
 			populate_dict(input, MachineDict, nbr_machines, t_days);
 			f_money = optim_solver(nbr_machines, i_money, t_days, MachineDict);
 			std::cout << "Case " << case_nbr << ": " << f_money << std::endl;
+			reset_dict(MachineDict);
 		}
 		else std::cout << "Case " << case_nbr << ": " << i_money << std::endl;
 	}
