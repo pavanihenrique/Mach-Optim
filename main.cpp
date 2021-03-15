@@ -9,61 +9,39 @@
 
 using MachineMap = std::map<int, std::shared_ptr<Machine>>;
 using MachineList = std::list<Machine *>;
-//using MachineList = std::list<std::shared_ptr<Machine>>;
 
 void populate_dict(std::ifstream& input, MachineMap& dict, int N, int T) {
 	int D = 0, P = 0, R = 0, G = 0;
-	int i = 0, key = 1;
-	//Machine* obj;
-	//Machine* aux;
-	MachineList aux_list;
-	
+	int i = 0, key = 1, min = 0;
+	MachineList aux_list;	
+	MachineList::iterator it_min = aux_list.begin();
+
 	for (i = 0; i < N; i++) {
 		input >> D >> P >> R >> G;
 		aux_list.push_back(new Machine(D, P, R, G));
 	}
 
-	for (i = 1; i <= T; i++) {
+	for (i = 0; i < N; ++i) {
+		it_min = aux_list.begin();
+		min = (*it_min)->getAvailability();
 		for (MachineList::iterator it = aux_list.begin(); it != aux_list.end(); ++it) {
-			if ((*it)->getAvailability() == i) {
-				std::shared_ptr<Machine> p(*it);
-				dict.insert(make_pair(key, p));
-				++key;
+			if ((*it)->getAvailability() < min) {
+				it_min = it;
+				min = (*it)->getAvailability();
 			}
 		}
+		std::shared_ptr<Machine> p(*it_min);
+		dict.insert(make_pair(key, p));
+		++key;
+		aux_list.erase(it_min);
 	}
 
-/*	for (std::list<Machine *>::iterator it = dict.begin(); it != dict.end(); ++it) {
-		if (it == dict.begin()) ++it;
-		else {
-			value = (*it)->getAvailability();
-			obj = (*it);
-			std::list<Machine*>::iterator j = it;
-			--j;
-
-			while (j != dict.begin() && (*j)->getAvailability() > value)
-			{
-				aux = (*j);
-				++j;
-				(*j) = aux;
-				--j;
-				--j;
-			}
-			++j;
-			(*j) = obj;
-		}
-	}
-*/
 	return;
 }
 
 void reset_dict(MachineMap& dict) {
 	for (MachineMap::iterator it = dict.begin(); it != dict.end(); ++it) {
-//		MachineMap::iterator it2 = it;
-//		++it2;
 		(it->second).reset();
-//		dict.erase(it);
-//		it = it2;
 	}
 	MachineMap::iterator dict_begin = dict.begin();
 	MachineMap::iterator dict_end = dict.end();
@@ -94,21 +72,19 @@ int buy_decision(MachineMap& dict, int curr_machine, int curr_money, int curr_da
 		avail_money = avail_money + dict[curr_machine]->getResellPrice();
 	}
 
-	// encontra o melhor candidato de compra baseado no resultado final, se mantido, e breakeven (critério de desempate)
 	for (MachineMap::iterator it = dict.find(i_index); it != dict.end(); ++it) {
 		if ((*(it->second)).getAvailability() == curr_day) {
 			if (avail_money >= (*(it->second)).getPrice()) {
 				result = avail_money - (*(it->second)).getPrice() + (*(it->second)).getGain() * days_left + (*(it->second)).getResellPrice();
 
 				breakeven = curr_day + 1;
-				curr_projection = curr_money;
-				if (curr_machine != 0) curr_projection = curr_projection + dict[curr_machine]->getGain();
-				candidate_projection = avail_money - (*(it->second)).getPrice();
-				while (curr_projection > candidate_projection && breakeven < T) {
-					++breakeven;
-					if (curr_machine != 0) curr_projection = curr_projection + dict[curr_machine]->getGain();
-					candidate_projection = candidate_projection + (*(it->second)).getGain();
-				}
+				int a = 0, b = 0, q = 0;
+				if (curr_machine != 0) a = (*(it->second)).getPrice() - dict[curr_machine]->getResellPrice();
+				else a = (*(it->second)).getPrice();
+				if (curr_machine != 0) b = (*(it->second)).getGain() - dict[curr_machine]->getGain();
+				else b = (*(it->second)).getGain();
+				if (b == 0) continue;
+				else breakeven = breakeven + a / b + (a % b != 0);
 
 				if (result > best_result || (best_candidate != curr_machine && result == best_result && breakeven < best_breakeven)) {
 					best_candidate = it->first;
@@ -120,29 +96,21 @@ int buy_decision(MachineMap& dict, int curr_machine, int curr_money, int curr_da
 		else if ((*(it->second)).getAvailability() > curr_day) break;
 	}
 
-	//verifica se existe uma melhor opção de compra durante o período de breakeven do melhor candidato
 	if (best_candidate != curr_machine && best_breakeven > curr_day + 2) {
 		curr_projection = curr_money;
 		avail_money = curr_money;
-		for (int day = curr_day + 1; day <= best_breakeven; day++) {
+		for (MachineMap::iterator it = dict.find(i_index); it != dict.end(); ++it) {
 			if (curr_machine != 0) {
-				curr_projection = curr_projection + dict[curr_machine]->getGain() * (day - curr_day);
+				curr_projection = curr_projection + dict[curr_machine]->getGain() * ((*(it->second)).getAvailability() - curr_day);
 				avail_money = curr_projection + dict[curr_machine]->getResellPrice();
 			}
-			days_left = T - day;
-			for (auto& it : dict) {
-				if ((*(it.second)).getAvailability() == day) {
-					if (avail_money >= (*(it.second)).getPrice()) {
-						result = avail_money - (*(it.second)).getPrice() + (*(it.second)).getGain() * days_left + (*(it.second)).getResellPrice();
-
-						if (result > best_result) {
-							best_candidate = 0;
-							break;
-						}
-					}
-				}
-				else if ((*(it.second)).getAvailability() > day) break;
+			if ((*(it->second)).getAvailability() >= best_breakeven) break;
+			if (avail_money >= (*(it->second)).getPrice()) {
+				days_left = T - (*(it->second)).getAvailability();
+				result = avail_money - (*(it->second)).getPrice() + (*(it->second)).getGain() * days_left + (*(it->second)).getResellPrice();
+				if (result > best_result) return 0;
 			}
+			
 		}
 	}
 
@@ -152,23 +120,28 @@ int buy_decision(MachineMap& dict, int curr_machine, int curr_money, int curr_da
 }
 
 int optim_solver(int N, int M, int T, MachineMap& dict) {
-	int curr_machine = 0, curr_money = M;
+	int curr_machine = 0, curr_money = M, curr_day = 1, next_dec = 0, next_index = 1;
 	int avail_index = 0, buy = 0;
-	//int D = 0, P = 0, R = 0, G = 0;
 
-	for (int curr_day = 1; curr_day <= T; ++curr_day) {
-		avail_index = check_availability(dict, curr_day);
-		if (avail_index != 0) {
-			buy = buy_decision(dict, curr_machine, curr_money, curr_day, T, avail_index);
-			if (buy) {
-				if (curr_machine != 0) curr_money = curr_money + dict[curr_machine]->getResellPrice();
-				curr_machine = buy;
-				curr_money = curr_money - dict[curr_machine]->getPrice();
-			}
-			else if (curr_machine != 0) curr_money = curr_money + dict[curr_machine]->getGain();
+	MachineMap::iterator it = dict.begin();
+	while (it != dict.end()) {
+		next_dec = (it->second)->getAvailability();
+		if (curr_machine != 0) curr_money = curr_money + (dict[curr_machine]->getGain()) * (next_dec - curr_day - 1);
+		curr_day = next_dec;
+		buy = buy_decision(dict, curr_machine, curr_money, curr_day, T, it->first);
+		if (buy) {
+			if (curr_machine != 0) curr_money = curr_money + dict[curr_machine]->getResellPrice();
+			curr_machine = buy;
+			if (curr_machine != 0) curr_money = curr_money - dict[curr_machine]->getPrice();
 		}
 		else if (curr_machine != 0) curr_money = curr_money + dict[curr_machine]->getGain();
+		while ((it->second)->getAvailability() == curr_day) {
+			++it;
+			if (it == dict.end()) break;
+		}
 	}
+
+	if (curr_machine != 0) curr_money = curr_money + (dict[curr_machine]->getGain()) * (T - curr_day);
 
 	if (curr_machine != 0) curr_money = curr_money + dict[curr_machine]->getResellPrice();
 
@@ -177,10 +150,7 @@ int optim_solver(int N, int M, int T, MachineMap& dict) {
 
 int main () {
 	int nbr_machines = 0, i_money = 0, t_days = 0;
-	//int curr_machine = 0, curr_money = 0, curr_day = 0;
-	//int D = 0, P = 0, R = 0, G = 0;
 	int end_run = 0, case_nbr = 0, f_money = 0;
-	//std::list<Machine*> MachineList;
 	MachineMap MachineDict;
 
 	std::ifstream input("input.txt");
