@@ -3,15 +3,15 @@
 
 class Machine {
 private:
-	int avail, price, resell, gain;
+	unsigned long long avail, price, resell, gain;
 
 public:
-	Machine(int D = 0, int P = 0, int R = 0, int G = 0) :avail{ D }, price{ P }, resell{ R }, gain{ G } {};
+	Machine(unsigned long long D = 0, unsigned long long P = 0, unsigned long long R = 0, unsigned long long G = 0) :avail{ D }, price{ P }, resell{ R }, gain{ G } {};
 	~Machine() {};
-	int getAvailability() const { return avail; };
-	int getPrice() const { return price; };
-	int getResellPrice() const { return resell; };
-	int getGain() const { return gain; };
+	unsigned long long getAvailability() const { return avail; };
+	unsigned long long getPrice() const { return price; };
+	unsigned long long getResellPrice() const { return resell; };
+	unsigned long long getGain() const { return gain; };
 };
 
 #endif // !MACHINE
